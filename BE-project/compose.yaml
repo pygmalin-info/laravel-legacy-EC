@@ -1,0 +1,51 @@
+name: BE-project # プロジェクト名（docker compose v2以降の構文）
+
+services:
+  # Webサーバコンテナ（Nginx）
+  web:
+    build:
+      context: ./docker/nginx # nginx用のDockerfileがあるディレクトリ
+      dockerfile: Dockerfile # 使用するDockerfile名
+    ports:
+      - 8080:80 # ホストの8080ポートをNginxの80番ポートにマッピング
+    volumes:
+      - .:/app # ソースコードを/appにマウント（PHPと共有）
+    container_name: nginx # コンテナ名を「nginx」に設定
+    hostname: nginx-host # コンテナ内でのホスト名を設定（オプション）
+
+  # アプリケーションサーバコンテナ（PHP-FPM）
+  app:
+    build:
+      context: ./docker/php # php用のDockerfileがあるディレクトリ
+      dockerfile: Dockerfile # 使用するDockerfile名
+    container_name: php # コンテナ名を「php」に設定
+    hostname: php-host # コンテナ内でのホスト名を設定（オプション）
+    volumes:
+      - .:/app # ソースコードをPHPにもマウント（Nginxと共有）
+
+  # データベースコンテナ（MySQL）
+  db:
+    build:
+      context: ./docker/mysql # mysql用のDockerfileがあるディレクトリ
+      dockerfile: Dockerfile # 使用するDockerfile名
+      args:
+        MYSQL_DATABASE: ${DB_DATABASE:-laravel_db} # 初期作成されるDB名
+        MYSQL_USER: ${DB_USERNAME:-laravel_user} # DBユーザー名
+        MYSQL_PASSWORD: ${DB_PASSWORD:-laravel_pass} # DBユーザーパスワード
+    container_name: mysql # コンテナ名を「mysql」に設定
+    restart: always # コンテナが落ちたときに自動再起動
+    ports:
+      - 3306:3306 # ホストの3306ポートをDBの3306ポートにマッピング
+    volumes:
+      - template-laravel-db:/var/lib/mysql # 永続化用ボリュームをマウント（データ保持）
+
+  mailpit:
+    image: axllent/mailpit
+    container_name: mailpit
+    ports:
+      - "8025:8025" # Web UI
+      - "1025:1025" # SMTP
+
+# ボリューム定義（MySQLのデータ永続化用）
+volumes:
+  template-laravel-db:

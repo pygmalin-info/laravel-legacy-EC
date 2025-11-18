@@ -1,0 +1,49 @@
+name: Code Checker
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "**/*.php" # PHPファイルが変更された場合にトリガー
+
+jobs:
+  phpstan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      # PHP のセットアップ
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: mbstring, pdo, pdo_mysql
+          tools: composer:v2
+
+      # Composer キャッシュ
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      # 依存関係インストール
+      - name: Install Dependencies
+        run: composer install -q --no-ansi --no-interaction --no-scripts --prefer-dist
+
+      # Laravel Pint（コードフォーマットチェック）
+      - name: Run Laravel Pint (Check Formatting)
+        run: |
+          ./vendor/bin/pint --test || (echo "❌ Laravel Pint によってフォーマットが必要なファイルが見つかりました。ローカルで 'pint' を実行し、変更をコミットしてください。" && exit 1)
+
+      # Larastan（PHPStan）
+      - name: Run Larastan
+        run: ./vendor/bin/phpstan analyse --memory-limit=2G
